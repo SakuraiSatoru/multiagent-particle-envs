@@ -7,6 +7,19 @@ class EntityState(object):
         self.p_pos = None
         # physical velocity
         self.p_vel = None
+        # physical orientation
+        self.p_rot = None
+        # physical altitude
+        self.p_alt = None
+
+    def __copy__(self):
+        s = type(self)()
+        s.p_pos = self.p_pos.copy()
+        s.p_rot = self.p_rot
+        s.p_alt = self.p_alt
+        s.p_vel = self.p_vel
+        return s
+
 
 # state of agents (including communication and internal/mental state)
 class AgentState(EntityState):
@@ -52,7 +65,7 @@ class Entity(object):
 
 # properties of landmark entities
 class Landmark(Entity):
-     def __init__(self):
+    def __init__(self):
         super(Landmark, self).__init__()
 
 # properties of agent entities
@@ -136,7 +149,7 @@ class World(object):
         for i,agent in enumerate(self.agents):
             if agent.movable:
                 noise = np.random.randn(*agent.action.u.shape) * agent.u_noise if agent.u_noise else 0.0
-                p_force[i] = agent.action.u + noise                
+                p_force[i] = agent.action.u + noise
         return p_force
 
     # gather physical forces acting on entities
@@ -148,10 +161,10 @@ class World(object):
                 [f_a, f_b] = self.get_collision_force(entity_a, entity_b)
                 if(f_a is not None):
                     if(p_force[a] is None): p_force[a] = 0.0
-                    p_force[a] = f_a + p_force[a] 
+                    p_force[a] = f_a + p_force[a]
                 if(f_b is not None):
                     if(p_force[b] is None): p_force[b] = 0.0
-                    p_force[b] = f_b + p_force[b]        
+                    p_force[b] = f_b + p_force[b]
         return p_force
 
     # integrate physical state
@@ -174,7 +187,7 @@ class World(object):
             agent.state.c = np.zeros(self.dim_c)
         else:
             noise = np.random.randn(*agent.action.c.shape) * agent.c_noise if agent.c_noise else 0.0
-            agent.state.c = agent.action.c + noise      
+            agent.state.c = agent.action.c + noise
 
     # get collision forces for any contact between two entities
     def get_collision_force(self, entity_a, entity_b):

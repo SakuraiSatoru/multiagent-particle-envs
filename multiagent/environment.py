@@ -26,7 +26,7 @@ class MultiAgentEnv(gym.Env):
         self.info_callback = info_callback
         self.done_callback = done_callback
         # environment parameters
-        self.discrete_action_space = True
+        self.discrete_action_space = False
         # if true, action is a number 0...N, otherwise action is a one-hot N-dimensional vector
         self.discrete_action_input = False
         # if true, even the action is continuous, action will be performed discretely
@@ -77,6 +77,12 @@ class MultiAgentEnv(gym.Env):
             self.viewers = [None] * self.n
         self._reset_render()
 
+    def seed(self, seed=None):
+        if seed is None:
+            np.random.seed(1)
+        else:
+            np.random.seed(seed)
+
     def step(self, action_n):
         obs_n = []
         reward_n = []
@@ -85,9 +91,12 @@ class MultiAgentEnv(gym.Env):
         self.agents = self.world.policy_agents
         # set action for each agent
         for i, agent in enumerate(self.agents):
+            if not agent.movable: continue
             self._set_action(action_n[i], agent, self.action_space[i])
         # advance world state
         self.world.step()
+        # update agents
+        self.agents = self.world.policy_agents
         # record observation for each agent
         for agent in self.agents:
             obs_n.append(self._get_obs(agent))
@@ -210,7 +219,7 @@ class MultiAgentEnv(gym.Env):
                     else:
                         word = alphabet[np.argmax(other.state.c)]
                     message += (other.name + ' to ' + agent.name + ': ' + word + '   ')
-            print(message)
+            # print(message)
 
         for i in range(len(self.viewers)):
             # create viewers (if necessary)
@@ -221,21 +230,45 @@ class MultiAgentEnv(gym.Env):
                 self.viewers[i] = rendering.Viewer(700,700)
 
         # create rendering geometry
-        if self.render_geoms is None:
+        # if self.render_geoms is None:
             # import rendering only if we need it (and don't import for headless machines)
             #from gym.envs.classic_control import rendering
-            from multiagent import rendering
-            self.render_geoms = []
-            self.render_geoms_xform = []
-            for entity in self.world.entities:
-                geom = rendering.make_circle(entity.size)
-                xform = rendering.Transform()
-                if 'agent' in entity.name:
-                    geom.set_color(*entity.color, alpha=0.5)
+
+        from multiagent import rendering
+        self.render_geoms = []
+        self.render_geoms_xform = []
+        for entity in self.world.entities:
+            geom = rendering.make_circle(entity.size)
+            xform = rendering.Transform()
+            if 'agent' in entity.name:
+                if not hasattr(entity, 'cur_construct_capacity') \
+                        or entity.cur_construct_capacity is None\
+                        or entity.cur_construct_capacity >= 1:
+                    geom.set_color(*entity.color, alpha=0.6)
                 else:
-                    geom.set_color(*entity.color)
-                geom.add_attr(xform)
-                self.render_geoms.append(geom)
+                    geom.set_color(*entity.color, alpha=0.6)
+            else:
+                geom.set_color(*entity.color, alpha=0.4)
+            geom.add_attr(xform)
+            self.render_geoms.append(geom)
+            xform.set_translation(*entity.state.p_pos)
+            self.render_geoms_xform.append(xform)
+
+            # if isinstance(entity, PPODrone) and entity.cur_construct_capacity >= 1:
+            #     geom_range = rendering.make_circle(0.4, filled=False)
+            #     geom_range.set_color(*entity.color, alpha=0.4)
+            #     geom_range.add_attr(xform)
+            #     self.render_geoms.append(geom_range)
+            #     self.render_geoms_xform.append(xform)
+
+            # orientation
+            if 'agent' in entity.name:
+                xform_rot = rendering.Transform()
+                geom_range = rendering.make_circle(0.02, filled=True)
+                geom_range.set_color(0, 0, 0, alpha=0.8)
+                geom_range.add_attr(xform_rot)
+                xform_rot.set_translation(*(entity.state.p_pos + entity.size * entity.state.p_rot))
+                self.render_geoms.append(geom_range)
                 self.render_geoms_xform.append(xform)
 
             # add geoms to viewer
@@ -248,15 +281,15 @@ class MultiAgentEnv(gym.Env):
         for i in range(len(self.viewers)):
             from multiagent import rendering
             # update bounds to center around agent
-            cam_range = 1
+            cam_range = 10
             if self.shared_viewer:
                 pos = np.zeros(self.world.dim_p)
             else:
                 pos = self.agents[i].state.p_pos
             self.viewers[i].set_bounds(pos[0]-cam_range,pos[0]+cam_range,pos[1]-cam_range,pos[1]+cam_range)
             # update geometry positions
-            for e, entity in enumerate(self.world.entities):
-                self.render_geoms_xform[e].set_translation(*entity.state.p_pos)
+            # for e, entity in enumerate(self.world.entities):
+            #     self.render_geoms_xform[e].set_translation(*entity.state.p_pos)
             # render to display or array
             results.append(self.viewers[i].render(return_rgb_array = mode=='rgb_array'))
 
