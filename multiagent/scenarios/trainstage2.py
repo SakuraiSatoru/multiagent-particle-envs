@@ -1,7 +1,7 @@
 import numpy as np
 import colorlover as cl
 from multiagent.scenario import BaseScenario
-from rl_drone_construction.utils.entities import PPODrone, TargetLandmark, ThreatEntity
+from rl_drone_construction.utils.entities import Drone, TargetLandmark, ThreatEntity
 from rl_drone_construction.utils.worlds import DroneWorldRayLidar
 
 
@@ -16,7 +16,7 @@ class Scenario(BaseScenario):
         num_threats = 3
         world.collaborative = False
 
-        world.agents = [PPODrone(i) for i in range(num_agents)]
+        world.agents = [Drone(i) for i in range(num_agents)]
         world.landmarks = [TargetLandmark() for i in range(num_targets)] + \
                           [ThreatEntity(uid=i) for i in range(num_threats)]
 

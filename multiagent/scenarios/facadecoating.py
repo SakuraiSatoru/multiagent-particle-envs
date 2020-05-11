@@ -1,7 +1,7 @@
 import copy
 import numpy as np
 from multiagent.scenario import BaseScenario
-from rl_drone_construction.utils.entities import PPODrone, TargetLandmark
+from rl_drone_construction.utils.entities import Drone, TargetLandmark
 from rl_drone_construction.utils.worlds import FacadeCoatingWorld
 
 
@@ -14,7 +14,7 @@ class Scenario(BaseScenario):
         num_agents = len(world.docks)
         world.collaborative = False
 
-        world.agents = [PPODrone(uid=i) for i in range(num_agents)]
+        world.agents = [Drone(uid=i) for i in range(num_agents)]
         world.landmarks = [TargetLandmark() for i in range(num_agents)]
 
         for i, supply in enumerate(world.supplies):
@@ -30,7 +30,10 @@ class Scenario(BaseScenario):
             agent.construct_capacity = 1
             agent.cur_construct_capacity = 0
             agent.battery = 100
-            agent.waiting = 100 * i
+            if i % 2:
+                agent.waiting = 100 * (i-1)
+            else:
+                agent.waiting = 100 * i
 
         self.reset_world(world)
         return world

@@ -237,29 +237,28 @@ class MultiAgentEnv(gym.Env):
         from multiagent import rendering
         self.render_geoms = []
         self.render_geoms_xform = []
+        for agent in self.world.agents:
+            for i, t in enumerate(agent.trajectory):
+                if i % 2: continue
+                geom = rendering.make_circle(0.02, filled=True)
+                xform = rendering.Transform()
+                geom.set_color(*agent.color, alpha=0.1)
+                geom.add_attr(xform)
+                self.render_geoms.append(geom)
+                xform.set_translation(*t)
+                self.render_geoms_xform.append(xform)
+
         for entity in self.world.entities:
             geom = rendering.make_circle(entity.size)
             xform = rendering.Transform()
             if 'agent' in entity.name:
-                if not hasattr(entity, 'cur_construct_capacity') \
-                        or entity.cur_construct_capacity is None\
-                        or entity.cur_construct_capacity >= 1:
-                    geom.set_color(*entity.color, alpha=0.6)
-                else:
-                    geom.set_color(*entity.color, alpha=0.6)
+                geom.set_color(*entity.color, alpha=0.6)
             else:
                 geom.set_color(*entity.color, alpha=0.4)
             geom.add_attr(xform)
             self.render_geoms.append(geom)
             xform.set_translation(*entity.state.p_pos)
             self.render_geoms_xform.append(xform)
-
-            # if isinstance(entity, PPODrone) and entity.cur_construct_capacity >= 1:
-            #     geom_range = rendering.make_circle(0.4, filled=False)
-            #     geom_range.set_color(*entity.color, alpha=0.4)
-            #     geom_range.add_attr(xform)
-            #     self.render_geoms.append(geom_range)
-            #     self.render_geoms_xform.append(xform)
 
             # orientation
             if 'agent' in entity.name:

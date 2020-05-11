@@ -1,7 +1,7 @@
 import copy
 import numpy as np
 from multiagent.scenario import BaseScenario
-from rl_drone_construction.utils.entities import PPODrone, TargetLandmark
+from rl_drone_construction.utils.entities import Drone, TargetLandmark
 from rl_drone_construction.utils.worlds import BrickLayingWorld
 
 
@@ -14,7 +14,7 @@ class Scenario(BaseScenario):
         num_agents = len(world.docks)
         world.collaborative = False
 
-        world.agents = [PPODrone(uid=i) for i in range(num_agents)]
+        world.agents = [Drone(uid=i) for i in range(num_agents)]
         world.landmarks = [TargetLandmark() for i in range(num_agents)]
 
         for i, supply in enumerate(world.supplies):

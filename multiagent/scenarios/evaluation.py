@@ -1,10 +1,8 @@
 import numpy as np
 import colorlover as cl
-from multiagent.core import World, Agent, Landmark
 from multiagent.scenario import BaseScenario
-from multiagent.observation import Conv1dObservation
-from utils.lidar import AgentLidar
-from utils.entities import PPODrone, DroneWorldRayLidar, TargetLandmark, ThreatEntity
+from rl_drone_construction.utils.entities import Drone, TargetLandmark, ThreatEntity
+from rl_drone_construction.utils.worlds import DroneWorldRayLidar
 
 # mirror goals
 
@@ -15,12 +13,12 @@ class Scenario(BaseScenario):
                                    mem_frames=1, dt=0.08)
         # set any world properties first
         world.dim_c = 2
-        num_agents = 10
+        num_agents = 20
         num_targets = num_agents
-        num_threats = 4
+        num_threats = 6
         world.collaborative = False
 
-        world.agents = [PPODrone(i) for i in range(num_agents)]
+        world.agents = [Drone(i) for i in range(num_agents)]
         world.landmarks = [TargetLandmark() for i in range(num_targets)] + \
                           [ThreatEntity(uid=i) for i in range(num_threats)]
 
@@ -31,21 +29,18 @@ class Scenario(BaseScenario):
             agent.lidar_range = 4.0
             agent.target = world.landmarks[i]
             agent.construct_range = 0.2  # origin 0.1
-            # agent.construct_time = 5
-            # agent.construct_capacity = 1
-            # agent.cur_construct_capacity = 1
         for i, landmark in enumerate(world.landmarks):
             landmark.collide = False
             landmark.movable = False
             if isinstance(landmark, TargetLandmark):
                 landmark.name = 'landmark %d' % i
-                landmark.size = 0.05
+                landmark.size = 0.1
         # make initial conditions
         self.reset_world(world)
         return world
 
     def generate_random_threat(self, threat, world):
-        threat.state.p_pos = np.random.uniform(-7, 7, 2)
+        threat.state.p_pos = np.random.uniform(-6, 6, 2)
         threat.size = np.random.uniform(0.4, 0.6)
 
     def generate_random_pose(self, agent, world):
@@ -64,13 +59,15 @@ class Scenario(BaseScenario):
         agent.target.state.p_pos = goal_pos
         dis_origin = np.linalg.norm(goal_pos)
         dis_goal = np.linalg.norm(agent.state.p_pos - goal_pos)
-        c = np.any([(np.linalg.norm(agent.target.state.p_pos - t.state.p_pos) - t.size) < 10*agent.size for t in world.threats])
-        while dis_origin > 8 or dis_goal > 9 or dis_goal < 7 or c:
+        dis_threats = np.any([(np.linalg.norm(agent.target.state.p_pos - t.state.p_pos) - t.size) < 5*agent.size for t in world.threats])
+        dis_targets = np.any([np.linalg.norm(agent.target.state.p_pos - a.target.state.p_pos) < 5*agent.size if (a != agent and a.target.state.p_pos is not None) else False for a in world.agents])
+        while dis_origin > 8 or dis_goal > 9 or dis_goal < 7 or dis_threats or dis_targets:
             goal_pos = np.random.uniform(-8, +8, 2)
             agent.target.state.p_pos = goal_pos
             dis_origin = np.linalg.norm(goal_pos)
             dis_goal = np.linalg.norm(agent.state.p_pos - goal_pos)
-            c = np.any([(np.linalg.norm(agent.target.state.p_pos - t.state.p_pos) - t.size) < 5*agent.size for t in world.threats])
+            dis_threats = np.any([(np.linalg.norm(agent.target.state.p_pos - t.state.p_pos) - t.size) < 5*agent.size for t in world.threats])
+            dis_targets = np.any([np.linalg.norm(agent.target.state.p_pos - a.target.state.p_pos) < 5*agent.size if (a != agent and a.target.state.p_pos is not None) else False for a in world.agents])
 
     def reset_world(self, world):
         # random properties for agents
@@ -80,16 +77,13 @@ class Scenario(BaseScenario):
         for threat in world.threats:
             self.generate_random_threat(threat, world)
         for i, agent in enumerate(world.agents):
-            # agent.size = np.random.uniform(0.2, 0.3)
             agent.size = 0.25
             agent.pseudo_collision_range = agent.size + 0.1
             agent.color = colors[i%n]
             agent.target.color = colors[i%n]
-            # agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
             self.generate_random_pose(agent, world)
             self.generate_random_goal(agent, world)
             world.goals.append(np.copy(agent.target.state.p_pos))
-
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.previous_state.p_pos = np.copy(agent.state.p_pos)
             agent.previous_state.p_vel = np.copy(agent.state.p_vel)
@@ -98,28 +92,6 @@ class Scenario(BaseScenario):
         for agent in world.agents:
             agent.agents_lidar = world.lidar.get_ray_lidar(agent)
             agent.lidar_memory = [agent.agents_lidar, agent.agents_lidar]
-
-    def benchmark_data(self, agent, world):
-        # raise NotImplementedError
-        print('benchmarking')
-        rew = 0
-        collisions = 0
-        occupied_landmarks = 0
-        min_dists = 0
-        for l in world.landmarks:
-            if not isinstance(l, TargetLandmark):
-                continue
-            dists = [np.sqrt(np.sum(np.square(a.state.p_pos - l.state.p_pos))) for a in world.agents]
-            min_dists += min(dists)
-            rew -= min(dists)
-            if min(dists) < 0.1:
-                occupied_landmarks += 1
-        if agent.collide:
-            for a in world.agents:
-                if self.is_collision(a, agent):
-                    rew -= 1
-                    collisions += 1
-        return (rew, collisions, min_dists, occupied_landmarks)
 
     def is_collision(self, agent1, agent2):
         dist = np.linalg.norm(agent1.state.p_pos - agent2.state.p_pos)
@@ -142,14 +114,7 @@ class Scenario(BaseScenario):
             return -15
         return ((d - s) / (p_range - agent.size) - 1) * 15
 
-
     def reward(self, agent, world):
-        """
-
-        :type agent: Drone
-        :param world:
-        :return:
-        """
         prev_d = np.linalg.norm(agent.previous_state.p_pos - agent.target.state.p_pos)
         d = np.linalg.norm(agent.state.p_pos - agent.target.state.p_pos)
         reward_g = (prev_d - d) * 2.5
@@ -174,13 +139,12 @@ class Scenario(BaseScenario):
                     reward_c += self.collision_reward(agent, a)
 
         if d < agent.construct_range and (np.abs(agent.state.p_vel) < 0.5).all(): # origin 0.2
-            print(agent.name, 'reached target')
+            if not agent.terminate:
+                print(agent.name, 'reached target')
             reward_g += 15
-            self.generate_random_goal(agent, world)
+            # self.generate_random_goal(agent, world)
             agent.terminate = True
         return reward_c + reward_g
-
-
 
     def observation(self, agent, world):
         out = [np.concatenate(agent.lidar_memory + [agent.agents_lidar]),
