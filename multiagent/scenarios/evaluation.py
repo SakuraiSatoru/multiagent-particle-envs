@@ -1,16 +1,16 @@
 import numpy as np
 import colorlover as cl
 from multiagent.scenario import BaseScenario
-from rl_drone_construction.utils.entities import Drone, TargetLandmark, ThreatEntity
-from rl_drone_construction.utils.worlds import DroneWorldRayLidar
+from mdac.utils.entities import Drone, TargetLandmark, ThreatEntity
+from mdac.utils.worlds import DroneWorld
 
 # mirror goals
 
 class Scenario(BaseScenario):
     def make_world(self):
         n_lidar_per_agent = 256
-        world = DroneWorldRayLidar(n_lidar_per_agent=n_lidar_per_agent,
-                                   mem_frames=1, dt=0.08)
+        world = DroneWorld(n_lidar_per_agent=n_lidar_per_agent,
+                           mem_frames=1, dt=0.08)
         # set any world properties first
         world.dim_c = 2
         num_agents = 20

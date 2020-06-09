@@ -1,8 +1,8 @@
 import copy
 import numpy as np
 from multiagent.scenario import BaseScenario
-from rl_drone_construction.utils.entities import Drone, TargetLandmark
-from rl_drone_construction.utils.worlds import FacadeCoatingWorld
+from mdac.utils.entities import Drone, TargetLandmark
+from mdac.utils.worlds import FacadeCoatingWorld
 
 
 class Scenario(BaseScenario):
